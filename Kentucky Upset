@@ -1,0 +1,184 @@
+###################################################################
+###########                                      ##################
+########### Machine Learning Contest by Kaggle   ##################
+########### By: Samir Rachid                     ##################
+########### Date: 3/14/15                        ##################
+###########                                      ##################    
+###################################################################
+
+## Load directories, libraries and data
+setwd("C:/Users/owner/desktop/machine learning contest")
+library(stringr)
+library(plyr)
+
+# data
+reg_res_com <- read.csv("regular_season_compact_results.csv")
+reg_res_det <- read.csv("regular_season_detailed_results.csv")
+teams <- read.csv("teams.csv")
+tour_res_com <- read.csv("tourney_compact_results.csv")
+tour_res_det <- read.csv("tourney_detailed_results.csv")
+seeds <- read.csv("tourney_seeds.csv")
+seeds2015 <- read.csv('tourney_seeds_2015.csv')
+
+##################################################################
+### historical score submission
+##################################################################
+
+
+## create vectors with all possible matchups for the four historical seasons 
+## that are going to be used for the sample submission
+
+years = c(2011,2012,2013,2014)
+scorevec = character(0)
+for (year in years){
+  print(year)
+  unique_teams_seas = unique(c(tour_res_com$wteam[tour_res_com$season==year], tour_res_com$lteam[tour_res_com$season==year]))
+  sorted_team = sort(unique_teams_seas, decreasing=FALSE)
+  print(sorted_team)
+  for (jj in 1: length(sorted_team)){
+    for (zz in jj+1: length(sorted_team)){
+      scorevec = append(scorevec, paste(year, sorted_team[jj], sorted_team[zz], sep="_"), after=  length(scorevec))
+    }
+  }  
+}
+
+
+## remove NAs and add 50% probs scores
+remove = grep("NA", scorevec)
+scorevec = scorevec[-remove]
+
+## format to fit Kaggle's Sample Submission
+scorevec = as.data.frame(scorevec)
+probs = rep(.5, length(scorevec))  
+scorevec$pred=probs
+names(scorevec)  = c("id", "pred")
+
+## write csv for submission
+write.csv(scorevec, file="historical scores.csv", row.names=FALSE)
+
+
+#####################################################################
+########    2015 score predictions        ###########################
+########    Using 2014 to set up bracket  ###########################
+#####################################################################
+
+
+team1 = numeric(0)
+team2 = numeric(0)
+print(sorted_team)
+
+sorted_team = sort(seeds2015$team, decreasing=FALSE)
+for (jj in 1: length(sorted_team)){
+  for (zz in jj+1: length(sorted_team)){
+    team1= append(team1, sorted_team[jj], after=length(team1))
+    team2= append(team2, sorted_team[zz], after=length(team2))
+  }
+}  
+
+
+
+### Create Matrix of Matchups 
+scoremat = as.data.frame(cbind(rep(2015, length(team1)), team1, team2))
+scoremat = scoremat[!is.na(scoremat[,3]),]; names(scoremat)[2] = "team_id"; teams = as.data.frame(teams)
+scoremat = join(scoremat, teams, by="team_id", type="left", match="first"); 
+names(scoremat) = c("team1", "year","team_id", "team_name1")
+scoremat = join(scoremat, teams, by="team_id", type='left', match='first')
+names(scoremat) = c("team2", "team1", "year", "team1_name", "team2_name")
+
+
+################################################
+#### create probabilities based of seeds    ####
+################################################
+
+
+## clean up seeds --
+seed = as.numeric(sapply(seeds2015$seed, function(x) gsub("W|X|Y|Z|a|b", "", x))) ; seeds2015$seed = seed
+
+
+names(scoremat)[2] = "team";
+scoremat = join(scoremat, seeds2015[, c('team', 'seed')], by="team", match="all");names(scoremat)[2] ="team1"; names(scoremat)[1] = "team"
+scoremat = join(scoremat, seeds2015[, c('team', 'seed')], by="team", match="all");names(scoremat)[c(1,6,7)] =c("team2", "seed1", "seed2")
+
+## create probabilities based off seeds
+prob1 = mapply(function(x,y) (sum(x,y)- x)/(x+y), scoremat$seed1, scoremat$seed2)
+prob2 = sapply(prob1, function(x) 1-x)  
+
+## create final scorematrix for submission 
+scoremat = cbind(scoremat, prob1, prob2)
+
+#####################################################3
+##### 1st bracket option  
+##### Wisconsin all way
+##### Scoremat1
+scoremat1 = scoremat
+
+wis1 = grep('Wisconsin', scoremat$team1_name)
+for (i in 1:length(wis1)){
+  scoremat1$prob1[wis1[i]] <- .99
+}
+
+wis2 = grep('Wisconsin', scoremat$team2_name)
+for (i in 1:length(wis2)){
+  scoremat1$prob1[wis2[i]] <- 0.01
+}
+
+## Manual Probs
+scoremat1$prob1[which(scoremat1$team1_name=="Oklahoma St" & scoremat1$team2_name=='Oregon')] <- 0.9
+scoremat1$prob1[which(scoremat1$team1_name=="Georgetown"  & scoremat1$team2_name=="Utah")] <- 0.1
+scoremat1$prob1[which(scoremat1$team1_name=="Gonzaga"  & scoremat1$team2_name=="Iowa St")] <- 0.1
+scoremat1$prob1[which(scoremat1$team1_name=="Iowa St"  & scoremat1$team2_name=="Villanova")] <- 0.9
+scoremat1$prob1[which(scoremat1$team1_name=="Indiana"  & scoremat1$team2_name=="Kansas")] <- 0.9
+scoremat1$prob1[which(scoremat1$team1_name=="Indiana"  & scoremat1$team2_name=="Wichita St")] <- 0.9
+scoremat1$prob1[which(scoremat1$team1_name=="San Diego St"  & scoremat1$team2_name=="St John's")] <- 0.9
+scoremat1$prob1[which(scoremat1$team1_name=="Georgia"  & scoremat1$team2_name=="Michigan St")] <- 0.1
+
+
+#####################################################3
+##### 2nd bracket option  
+##### Wisconsin all way + ~ events
+##### Scoremat2
+scoremat2 = scoremat
+
+wis1 = grep('Wisconsin', scoremat$team1_name)
+for (i in 1:length(wis1)){
+  scoremat2$prob1[wis1[i]] <- .99
+}
+
+wis2 = grep('Wisconsin', scoremat$team2_name)
+for (i in 1:length(wis2)){
+  scoremat2$prob1[wis2[i]] <- 0.01
+}
+
+## Manual Probs
+scoremat2$prob1[which(scoremat2$team1_name=="Oklahoma St" & scoremat2$team2_name=='Oregon')] <- 0.9
+scoremat2$prob1[which(scoremat2$team1_name=="Georgetown"  & scoremat2$team2_name=="Utah")] <- 0.1
+scoremat2$prob1[which(scoremat2$team1_name=="Gonzaga"  & scoremat2$team2_name=="Iowa St")] <- 0.1
+scoremat2$prob1[which(scoremat2$team1_name=="Iowa St"  & scoremat2$team2_name=="Villanova")] <- 0.9
+
+# Kentucky upset in elite 8
+scoremat2$prob1[which(scoremat2$team1_name=="Kansas"  & scoremat2$team2_name=="Kentucky")] <- 0.9
+scoremat2$prob1[which(scoremat2$team1_name=="Indiana"  & scoremat2$team2_name=="Kentucky")] <- 0.9
+scoremat2$prob1[which(scoremat2$team1_name=="Butler"  & scoremat2$team2_name=="Kentucky")] <- 0.9
+scoremat2$prob1[which(scoremat2$team1_name=="Kentucky"  & scoremat2$team2_name=="Wichita St")] <- 0.1
+scoremat2$prob1[which(scoremat2$team1_name=="Kentucky"  & scoremat2$team2_name=="Notre Dame")] <- 0.1
+scoremat2$prob1[which(scoremat2$team1_name=="Kentucky"  & scoremat2$team2_name=="Maryland")] <- 0.1
+
+scoremat2$prob1[which(scoremat2$team1_name=="Indiana"  & scoremat2$team2_name=="Wichita St")] <- 0.9
+scoremat2$prob1[which(scoremat2$team1_name=="San Diego St"  & scoremat2$team2_name=="St John's")] <- 0.9
+scoremat2$prob1[which(scoremat2$team1_name=="Georgia"  & scoremat2$team2_name=="Michigan St")] <- 0.1
+
+
+
+
+
+submission1 = mapply(function(x,y,z) paste(x,y,z, sep="_"), scoremat1$year, scoremat1$team1, scoremat1$team2)
+submission1 = as.data.frame(cbind(submission1, scoremat1$prob1)); names(submission1) = c('id', 'pred')
+
+
+submission2 = mapply(function(x,y,z) paste(x,y,z, sep="_"), scoremat2$year, scoremat2$team1, scoremat2$team2)
+submission2 = as.data.frame(cbind(submission2, scoremat2$prob1)); names(submission2) = c('id', 'pred')
+
+write.csv(submission1, file='submission1.csv', row.names=FALSE)
+write.csv(submission2, file='submission2.csv', row.names=FALSE)
+
+
