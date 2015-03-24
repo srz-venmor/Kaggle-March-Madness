@@ -31,7 +31,6 @@ seeds2015 <- read.csv('tourney_seeds_2015.csv')
 years = c(2011,2012,2013,2014)
 scorevec = character(0)
 for (year in years){
-  print(year)
   unique_teams_seas = unique(c(tour_res_com$wteam[tour_res_com$season==year], tour_res_com$lteam[tour_res_com$season==year]))
   sorted_team = sort(unique_teams_seas, decreasing=FALSE)
   print(sorted_team)
