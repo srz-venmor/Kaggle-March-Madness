@@ -106,7 +106,7 @@ prob2 = sapply(prob1, function(x) 1-x)
 ## create final scorematrix for submission 
 scoremat = cbind(scoremat, prob1, prob2)
 
-#####################################################3
+#####################################################
 ##### 1st bracket option  
 ##### Wisconsin all way
 ##### Scoremat1
